@@ -1,78 +1,187 @@
 # LZ77 + Huffman Mini Compressor
 
-This project is a lossless compression tool built using **LZ77** and **Huffman coding**. LZ77 removes redundancy by replacing repeated patterns with references, while Huffman coding compresses the resulting data using variable length bit encoding based on symbol frequency. 
+A lossless compression tool combining:
 
-The implementation includes bit-level packing, a custom file format, and integrity verification using an FNV-1a hash to ensure exact reconstruction during decompression.
+- LZ77 → removes repeated patterns
+- Huffman Coding → compresses symbols based on frequency
 
-## Build
+**Why LZ77 before Huffman?**
 
-```console
-g++ -std=c++17 -O2 -Iinclude -o lztool src/main.cpp
-g++ -std=c++17 -O2 -Iinclude -o compress src/compress.cpp
-g++ -std=c++17 -O2 -Iinclude -o decompress src/decompress.cpp
-```
-
-## Run
-
-Menu tool:
-```console
-./lztool
-```
-
-## Compression & Decompression Pipelines
-
-#### Compression
-
-![Compression Diagram](Diagram/Compression.png)
-
-#### Decompression
-
-![Decompression Diagram](Diagram/Decompression.png)
+Huffman alone cannot detect patterns,
+only frequency leading to a worse compression
 
 
-## How It Works
+### Complexity
 
-The compression pipeline consists of two main stages: LZ77 for pattern reduction and Huffman coding for entropy encoding.
-
-### Compression
-
-1. **Input Processing**  
-   The input file is read in binary form and stored as a byte stream.
-
-2. **LZ77 Compression**  
-   A sliding window is used to find repeated sequences in the data.  
-   - If a match is found, it is encoded as an *(offset, length)* pair.  
-   - Otherwise, the byte is stored as a literal.  
-   These tokens are packed into a compact bit-level representation.
-
-3. **Huffman Encoding**  
-   The token stream is analyzed to compute symbol frequencies.  
-   A Huffman tree is built, assigning shorter bit codes to more frequent symbols.  
-   The data is then encoded into a compressed bitstream.
-
-4. **File Construction**  
-   The compressed file `.lzhf` contains:
-   - Magic header `LZHF`
-   - Original file size
-   - Token stream size
-   - FNV-1a checksum (for verification)
-   - Frequency table (for Huffman decoding)
-   - Encoded bitstream
+``LZ77 → O(n × window)`` <br>
+``Huffman → O(n log n)``
 
 ---
 
-### Decompression
+## Build
 
-1. **Header Parsing**  
-   The compressed file is read and metadata is extracted, including sizes, frequency table, and checksum.
+```bash
+g++ -std=c++17 -O2 -Iinclude -o lztool src/main.cpp
+````
 
-2. **Huffman Decoding**  
-   The bitstream is decoded using the reconstructed Huffman tree to recover the original LZ77 token stream.
+---
 
-3. **LZ77 Decompression**  
-   The token stream is processed to rebuild the original data:
-   - Literals are copied directly  
-   - Back references copy previously reconstructed data  
+## Run
 
-4. **Verification**  
-   A new FNV-1a hash is computed and compared with the stored checksum to ensure lossless reconstruction.
+```bash
+./lztool
+```
+
+---
+
+## Pipeline
+
+```
+Input
+  ↓
+LZ77
+  ↓
+Packed byte stream
+  ↓
+Huffman
+  ↓
+Compressed bitstream
+  ↓
+.lzhf file
+```
+
+---
+
+## LZ77 Design
+
+* Window size: 4096 bytes
+* Max match length: 18
+* Min match length: 3
+
+### Encoding
+
+```
+Literal:
+0 + 8 bits
+
+Match:
+1 + 12 bits (offset) + 4 bits (length)
+```
+
+### Notes
+
+* 12-bit offset → supports window up to 4096
+* Length stored as (len - 3)
+* Actual length range: 3–18
+
+---
+
+## Huffman Design
+
+* Built from LZ77 output (not original data)
+* Min-heap used to construct tree
+* Left = 0, Right = 1
+
+### Properties
+
+* Prefix-free codes
+* No separators needed
+* Frequent symbols → shorter codes
+
+---
+
+## File Format (.lzhf)
+
+```
+[4 bytes]  "LZHF"
+[4 bytes]  Original size
+[4 bytes]  LZ77 size
+[4 bytes]  Checksum
+
+[1024 bytes] Frequency table (256 × uint32)
+
+[variable] Bitstream
+```
+
+---
+
+## Compression
+
+```
+Read input file
+  ↓
+LZ77 compress → packed stream
+  ↓
+Build frequency table
+  ↓
+Huffman encode → bitstream
+  ↓
+Write file (header + freq + bits)
+```
+
+### Notes
+
+* Huffman operates on LZ77 output
+* Bit-level packing used to store variable-length codes
+* Frequency table is stored to rebuild tree during decoding
+
+---
+
+## Decompression
+
+```
+Read file
+  ↓
+Parse header (sizes, checksum, frequency table)
+  ↓
+Rebuild Huffman tree
+  ↓
+Decode bitstream → LZ77 packed stream
+  ↓
+LZ77 decode → original data
+```
+
+### Notes
+
+* Huffman decoding reads bits one at a time:
+
+  * 0 → left
+  * 1 → right
+
+* Symbol produced at leaf node
+
+* Prefix-free property removes need for delimiters
+
+* Decoding stops using:
+
+  * packedSize (Huffman output size)
+  * origSize (final output size)
+
+* Bitstream may contain padding bits
+
+* LZ77 decoding:
+
+  * literals → direct copy
+  * matches → copy from previous output
+
+**Why prefix-free codes matter?**
+
+Huffman codes are prefix free, meaning no code is a prefix of another.  
+This allows decoding without explicit delimiters the tree structure determines symbol boundaries.
+
+---
+
+## Integrity Check
+
+* Uses FNV-1a hash
+* Stored during compression
+* Verified after decompression
+* Ensures exact reconstruction
+
+---
+
+## Limitations
+
+* 1024-byte frequency table overhead
+* Brute-force LZ77 matching (O(n × window))
+* Entire file loaded into memory

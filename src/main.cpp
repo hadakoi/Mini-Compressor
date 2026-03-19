@@ -4,6 +4,7 @@
 #include "../include/huffman.hpp"
 using namespace std;
 
+// write/read 32-bit values (used in file header)
 static void writeU32(ofstream &out,uint32_t v){
     out.write((char*)&v,4);
 }
@@ -14,6 +15,7 @@ static uint32_t readU32(ifstream &in){
     return v;
 }
 
+// checksum to verify data integrity
 static uint32_t fnv1a(const vector<uint8_t> &data){
     uint32_t h = 2166136261u;
     for(uint8_t b : data){
@@ -23,6 +25,7 @@ static uint32_t fnv1a(const vector<uint8_t> &data){
     return h;
 }
 
+// simple extension check
 static bool endsWith(const string &s,const string &suf){
     if(s.size() >= suf.size()){
         if(s.compare(s.size() - suf.size(),suf.size(),suf) == 0){
@@ -52,10 +55,12 @@ int main(){
             return 1;
         }
 
+        // read full file
         vector<uint8_t> data((istreambuf_iterator<char>(in)),istreambuf_iterator<char>());
 
+        // LZ77 → Huffman pipeline
         auto packed = lz77_compress_packed(data);
-        auto freq = huff_build_freq(packed);
+        auto freq = huff_build_freq(packed); 
         auto bits = huff_encode(packed,freq);
         uint32_t checksum = fnv1a(data);
 
@@ -65,6 +70,7 @@ int main(){
             return 1;
         }
 
+        // file format: header + metadata + freq + compressed bits
         out.write("LZHF",4);
         writeU32(out,(uint32_t)data.size());
         writeU32(out,(uint32_t)packed.size());
@@ -77,6 +83,7 @@ int main(){
         out.write((char*)bits.data(),bits.size());
         out.close();
 
+        // size comparison
         ifstream in2(inName,ios::binary | ios::ate);
         ifstream out2(outName,ios::binary | ios::ate);
 
@@ -121,11 +128,13 @@ int main(){
         char magic[4];
         in.read(magic,4);
 
+        // validate file format
         if(strncmp(magic,"LZHF",4) != 0){
             cerr << "Invalid file.\n";
             return 1;
         }
 
+        // read metadata
         uint32_t origSize = readU32(in);
         uint32_t packedSize = readU32(in);
         uint32_t checksum = readU32(in);
@@ -135,8 +144,10 @@ int main(){
             freq[i] = readU32(in);
         }
 
+        // remaining data = compressed bitstream
         vector<uint8_t> bits((istreambuf_iterator<char>(in)),istreambuf_iterator<char>());
 
+        // Huffman → LZ77 decode pipeline
         auto packed = huff_decode(bits,freq,packedSize);
         auto outData = lz77_decompress_packed(packed,origSize);
 
@@ -148,6 +159,7 @@ int main(){
 
         out.write((char*)outData.data(),outData.size());
 
+        // verification
         ifstream in2(inName,ios::binary | ios::ate);
         ifstream out2(outName,ios::binary | ios::ate);
 
