@@ -1,5 +1,7 @@
 #pragma once
-#include <bits/stdc++.h>
+#include <cstddef>
+#include <cstdint>
+#include <vector>
 using namespace std;
 
 struct BitWriter{

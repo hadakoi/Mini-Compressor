@@ -1,4 +1,11 @@
-#include <bits/stdc++.h>
+#include <cstdint>
+#include <cstring>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <iterator>
+#include <string>
+#include <vector>
 #include "../include/bitstream.hpp"
 #include "../include/lz77.hpp"
 #include "../include/huffman.hpp"
@@ -158,6 +165,7 @@ int main(){
         }
 
         out.write((char*)outData.data(),outData.size());
+        out.close();
 
         // verification
         ifstream in2(inName,ios::binary | ios::ate);

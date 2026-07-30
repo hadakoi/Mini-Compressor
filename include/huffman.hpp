@@ -1,5 +1,8 @@
 #pragma once
-#include <bits/stdc++.h>
+#include <cstddef>
+#include <cstdint>
+#include <queue>
+#include <vector>
 #include "bitstream.hpp"
 using namespace std;
 

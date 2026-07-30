@@ -21,8 +21,8 @@ only frequency leading to a worse compression
 ## Build
 
 ```bash
-g++ -std=c++17 -O2 -Iinclude -o lztool src/main.cpp
-````
+make
+```
 
 ---
 
@@ -31,6 +31,43 @@ g++ -std=c++17 -O2 -Iinclude -o lztool src/main.cpp
 ```bash
 ./lztool
 ```
+
+---
+
+## Benchmark
+
+The benchmark times the compression and decompression pipelines in memory, so
+file-system speed is not included. It performs one warmup, reports the median of
+five runs, includes the complete 1,040-byte `.lzhf` header in the compression
+ratio, and verifies that decompression exactly reproduces the input.
+
+```bash
+make check
+make bench
+```
+
+Benchmark another file or increase the number of measured runs:
+
+```bash
+./benchmark/benchmark --runs 10 path/to/file
+```
+
+Run the standard 11-file Canterbury Corpus benchmark:
+
+```bash
+make bench-canterbury
+```
+
+The corpus target downloads public benchmark data into `/tmp`; it does not add
+the dataset to the repository. When multiple files are supplied, the benchmark
+also prints aggregate size and throughput statistics.
+
+Use a release build and record the CPU, compiler version, input data, input
+size, run count, compression ratio, and compression/decompression throughput
+when publishing results.
+
+The benchmark source and recorded Canterbury results are kept in the
+[`benchmark`](benchmark/) directory.
 
 ---
 

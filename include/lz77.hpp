@@ -1,5 +1,8 @@
 #pragma once
-#include <bits/stdc++.h>
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <vector>
 #include "bitstream.hpp"
 using namespace std;
 
